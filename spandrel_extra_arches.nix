@@ -11,6 +11,7 @@ buildPythonPackage rec {
     owner = "chaiNNer-org";
     repo = "spandrel";
     rev = "refs/tags/v${version}";
+    #hash = "sha256-saRSosJ/pXmhLX5VqK3IBwT1yo14kD4nwNw0bCT2o5w";
     hash = "sha256-BiC4gmRsNkRAUonKHV7U/hvOP00pIPtm40ydmSlNDCI=";
   };
 

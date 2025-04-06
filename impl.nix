@@ -4,19 +4,20 @@
   cstr,
   img2texture,
   pilgram,
-  spandrel,
-  spandrel_extra_arches,
+  # spandrel,
+  # spandrel_extra_arches,
   ...
 }: let
+  # Simplified logic for hardware dependencies based on variant
   hardware_deps = with pkgs;
-  #if variant == "CUDA" then [
-    [
-      cudatoolkit
-      cudaPackages.cuda_nvcc
-      cudaPackages.cuda_cuobjdump
-      cudaPackages.cuda_nvdisasm
-      cudaPackages.cuda_cudart
-      cudaPackages.cuda_cupti
+    if variant == "CUDA"
+    then [
+      cudaPackages_12_8.cudatoolkit
+      cudaPackages_12_8.cuda_nvcc
+      cudaPackages_12_8.cuda_cuobjdump
+      cudaPackages_12_8.cuda_nvdisasm
+      cudaPackages_12_8.cuda_cudart
+      cudaPackages_12_8.cuda_cupti
       linuxKernel.packages.linux_xanmod_latest.nvidia_x11_production_open
       xorg.libXi
       xorg.libXmu
@@ -26,20 +27,22 @@
       xorg.libXv
       xorg.libXrandr
       zlib
-
-      # for xformers
       pkg-config
       gcc
-    ];
-  #else if variant == "ROCM" then [
-  #  rocmPackages.rocm-runtime
-  #  pciutils
-  #] else if variant == "CPU" then [
-  #] else throw "You need to specify which variant you want: CPU, ROCm, or CUDA.";
-              #substituteInPlace python/setup.py \
-              #  --replace "/usr/local/cuda/bin/ptxas" "${pkgs.cudaPackages.cuda_nvcc}/bin/ptxas"
-              #mkdir -p $out/lib/python3.11/site-packages/triton/third_party/cuda/bin
-              #ln -s ${pkgs.cudaPackages.cuda_nvcc}/bin/ptxas $out/lib/python3.11/site-packages/triton/third_party/cuda/bin/ptxas
+    ]
+    else if variant == "ROCM"
+    then [
+      rocmPackages.rocm-runtime
+      pciutils
+    ]
+    else if variant == "CPU"
+    then [
+      # CPU-specific deps if any
+    ]
+    else throw "You need to specify which variant you want: CPU, ROCm, or CUDA.";
+
+  torch-pkg = pkgs.python311Packages.torch-nightly or pkgs.python311Packages.torch;
+  torchvision-pkg = pkgs.python311Packages.torchvision-nightly or pkgs.python311Packages.torchvision;
 in
   pkgs.mkShell rec {
     name = "stable-diffusion-webui";
@@ -66,98 +69,75 @@ in
         ffmpeg
         freeglut
 
-        (python311.withPackages (python-pkgs: with python-pkgs; [
-          #python-pkgs.pytorch.override ({
-          #  cudaSupport = true; # Enable CUDA support
-          #})
-          # python-pkgs.pytorch-bin
-          # python-pkgs.torchWithCuda
-          # python-pkgs.torchWithCuda.lib
-          # python-pkgs.triton
-          #python-pkgs.triton.override ({
-          #  pythonRemoveDeps = [ "torch" ];
-          #  cudaSupport = true;
-          #})
-          #python-pkgs.triton.override ({
-          #  # patchPhase = ''
-          #  #   substituteInPlace python/setup.py \
-          #  #     --replace "/usr/local/cuda/bin/ptxas" "${pkgs.cudaPackages.cuda_nvcc}/bin/ptxas"
-          #  #   mkdir -p $out/lib/python3.11/site-packages/triton/third_party/cuda/bin
-          #  #   ln -sf ${pkgs.cudaPackages.cuda_nvcc}/bin/ptxas $out/lib/python3.11/site-packages/triton/third_party/cuda/bin/ptxas
-          #  # '';
-          #  # cudaPackages = {
-          #  #   cuda_nvcc = pkgs.cudaPackages.cuda_nvcc;
-          #  #   cuda_cudart = pkgs.cudaPackages.cuda_cudart;
-          #  #   cuda_cupti = pkgs.cudaPackages.cuda_cupti;
-          #  #   cuda_nvdisasm = pkgs.cudaPackages.cuda_nvdisasm;
-          #  #   cuda_cuobjdump = pkgs.cudaPackages.cuda_cuobjdump;
-          #  # };
-          #  #cudaSupport = true; # Enable CUDA support
-          #})
-          # torch
-          # triton
-          torchvision
-          torchaudio
-          torchsde
-          einops
-          transformers
-          safetensors
-          aiohttp
-          pyyaml
-          pillow
-          scipy
-          tqdm
-          psutil
-          kornia
-          numba
-          # .override ({ version = "0.60.0"; })
-          opencv4
-          GitPython
-          numexpr
-          matplotlib
-          pandas
-          imageio-ffmpeg
-          scikit-image
-          pip
-          simpleeval
-          (pkgs.callPackage ./dynamicprompts.nix {
-            buildPythonPackage = python-pkgs.buildPythonPackage;
-            fetchFromGitHub = pkgs.fetchFromGitHub;
-            setuptools = python-pkgs.setuptools;
-            lib = pkgs.lib;  # if your file uses "with lib;"
-            hatchling = python-pkgs.hatchling;
-            pyparsing = python-pkgs.pyparsing;
-            jinja2 = python-pkgs.jinja2;
-          })
+        (python311.withPackages (python-pkgs:
+          with python-pkgs; [
+            # Use the torch override from our overlay
 
-          spandrel
-          # = (pkgs.callPackage ./spandrel.nix {
-          # })
+            torch
+            torchvision
+            # torchsde
+            # torchaudio-pkg
 
-          spandrel_extra_arches
-          # (pkgs.callPackage ./spandrel_extra_arches.nix {
-          # })
-          accelerate
+            opencv4
+            opencv-python-headless
 
-          # WAS Nodes Deps
-          fairscale
-          cstruct
-          joblib
-          llvmlite
-          opencv-python-headless
-          ffmpy.override ({
-            version = "0.3.0";
-          })
-          rpds-py
-          scikit-learn
-          timm
-          cmake
-          referencing
-          platformdirs
-          img2texture
-          cstr
-          pilgram
-        ]))
+            #torch
+            triton
+            #torchvision
+            #torchaudio
+            #torchsde
+            einops
+            transformers
+            safetensors
+            aiohttp
+            pyyaml
+            pillow
+            scipy
+            tqdm
+            psutil
+            kornia
+            numba
+            GitPython
+            numexpr
+            matplotlib
+            pandas
+            imageio-ffmpeg
+            scikit-image
+            pip
+            simpleeval
+            (pkgs.callPackage ./dynamicprompts.nix {
+              buildPythonPackage = python-pkgs.buildPythonPackage;
+              fetchFromGitHub = pkgs.fetchFromGitHub;
+              setuptools = python-pkgs.setuptools;
+              lib = pkgs.lib;
+              hatchling = python-pkgs.hatchling;
+              pyparsing = python-pkgs.pyparsing;
+              jinja2 = python-pkgs.jinja2;
+            })
+
+            #spandrel
+            #spandrel_extra_arches
+            accelerate
+
+            # WAS Nodes Deps
+            fairscale
+            cstruct
+            joblib
+            llvmlite
+            ffmpy.override
+            {
+              version = "0.3.0";
+            }
+            rpds-py
+            scikit-learn
+            timm
+            cmake
+            referencing
+            platformdirs
+            img2texture
+            cstr
+            pilgram
+          ]))
       ];
 
     nativeBuildInputs = with pkgs; [
@@ -166,20 +146,21 @@ in
       pkg-config
     ];
 
-
-    CUDA_PATH="${pkgs.cudatoolkit}";
-    LD_LIBRARY_PATH="${with pkgs; lib.makeLibraryPath [
-      stdenv.cc.cc.lib
-      linuxKernel.packages.linux_xanmod_latest.nvidia_x11_production_open
-      cudatoolkit
-      libGL
-      libGLU
-      cudaPackages.cuda_nvcc
-      cudaPackages.cuda_cuobjdump
-      cudaPackages.cuda_nvdisasm
-      cudaPackages.cuda_cudart
-      cudaPackages.cuda_cupti
-    ]}";
-    EXTRA_LDFLAGS="-L/lib -L${pkgs.cudatoolkit}/lib:${pkgs.cudatoolkit}/lib64 -L${pkgs.linuxKernel.packages.linux_xanmod_latest.nvidia_x11_production_open}/lib";
-    EXTRA_CCFLAGS="-I/usr/include";
+    # Environment variables - use CUDA 12.0 specifically
+    CUDA_PATH = "${pkgs.cudaPackages_12_8.cudatoolkit}";
+    LD_LIBRARY_PATH = "${with pkgs;
+      lib.makeLibraryPath [
+        stdenv.cc.cc.lib
+        linuxKernel.packages.linux_xanmod_latest.nvidia_x11_production_open
+        cudaPackages_12_8.cudatoolkit
+        libGL
+        libGLU
+        cudaPackages_12_8.cuda_nvcc
+        cudaPackages_12_8.cuda_cuobjdump
+        cudaPackages_12_8.cuda_nvdisasm
+        cudaPackages_12_8.cuda_cudart
+        cudaPackages_12_8.cuda_cupti
+      ]}";
+    EXTRA_LDFLAGS = "-L/lib -L${pkgs.cudaPackages_12_8.cudatoolkit}/lib:${pkgs.cudaPackages_12_8.cudatoolkit}/lib64 -L${pkgs.linuxKernel.packages.linux_xanmod_latest.nvidia_x11_production_open}/lib";
+    EXTRA_CCFLAGS = "-I/usr/include";
   }
